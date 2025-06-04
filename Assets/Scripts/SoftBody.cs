@@ -6,12 +6,13 @@ class Constraint
     // public int[] pointIndexes = new();
 }
 
+
 public class SoftBody : MonoBehaviour
 {
-    public Vector3[] points;
-    public float[] masses;
+    public SoftBodySystem system;
     public int[] indexes;
     public ValueTuple<int, int>[] edges;
+    public bool solveOnCPU = true;
 
     Mesh mesh;
 
@@ -19,29 +20,28 @@ public class SoftBody : MonoBehaviour
     void Start()
     {
         mesh = GetComponent<MeshFilter>().mesh;
-        Utils.UniquePoints(mesh.vertices, out points, out indexes);
+        Utils.UniquePoints(mesh.vertices, out system.points, out indexes);
         Utils.UniqueEdges(mesh.triangles, indexes, out edges);
-        masses = new float[points.Length];
-        for (int i = 0; i < masses.Length; ++i)
-            masses[i] = 1;
+        system.masses = new float[system.points.Length];
+        foreach (ref var mass in system.masses.AsSpan())
+            mass = 1;
 
         mesh.MarkDynamic();
     }
 
-    // Update is called once per frame
+    // Consider doing FixedUpdate instead?
     void Update()
     {
-        // logic goes here
-        foreach (ref var point in points.AsSpan())
-            point += new Vector3(0, 1, 0) * Time.deltaTime;
-
-        // logic ends here
-        CommitMesh();
+        if (solveOnCPU)
+        {
+            PositionBasedDynamicsSystem.Solve(ref system, Time.deltaTime);
+            CommitMesh();
+        }
     }
 
     void CommitMesh()
     {
-        Utils.Apply(points, indexes, out var newVertices);
+        Utils.Apply(system.points, indexes, out var newVertices);
         mesh.vertices = newVertices;
         mesh.UploadMeshData(false);
     }
