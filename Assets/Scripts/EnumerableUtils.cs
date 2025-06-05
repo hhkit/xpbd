@@ -1,8 +1,29 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
-static class EnumerableUtils
+public static class EnumerableUtils
 {
+  public static Span<TResult> Reinterpret<TSource, TResult>(this TSource[] arr)
+     where TResult : struct
+     where TSource : struct
+  {
+    return MemoryMarshal.Cast<TSource, TResult>(arr.AsSpan());
+  }
+
+
+  public static IEnumerable<TSource> Duplicate<TSource>(this IEnumerable<TSource> source, int count)
+  {
+    return source.Select((v, _) =>
+    {
+      var res = new TSource[count];
+      Array.Fill(res, v);
+      return res;
+    })
+      .SelectMany(i => i);
+  }
+
   public static IEnumerable<TResult> SelectTwo<TSource, TResult>(this IEnumerable<TSource> source,
                                                                    Func<TSource, TSource, TResult> selector)
   {

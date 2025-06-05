@@ -66,5 +66,7 @@
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj",
     },
-    "dotnet.defaultSolution": "XPBD.sln"
+    "dotnet.defaultSolution": "XPBD.sln",
+    "omnisharp.useModernNet": false,
+    "vstuc.enableMessageCompletion": true
 }
