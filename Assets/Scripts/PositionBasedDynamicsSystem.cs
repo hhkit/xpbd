@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using UnityEngine;
+using MathNet;
 
 /// <summary>
 /// A struct of array representation of a set of point masses

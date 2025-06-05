@@ -43,7 +43,6 @@ public class SoftBody : MonoBehaviour
 
         ApplyTransform();
 
-        system.prevPositions = system.positions.ToArray();
         system.masses = new float[system.positions.Length];
         foreach (ref var mass in system.masses.AsSpan())
             mass = 1;
@@ -59,9 +58,9 @@ public class SoftBody : MonoBehaviour
         if (!mesh)
             mesh = GetComponent<MeshFilter>().mesh;
         if (!cached)
-        {
             ProcessMesh();
-        }
+
+        system.prevPositions = system.positions.ToArray();
     }
 
     // Consider doing FixedUpdate instead?
@@ -89,7 +88,7 @@ public class SoftBody : MonoBehaviour
     {
         Gizmos.color = Color.cyan;
         foreach (var vertex in system.positions){
-            Gizmos.DrawSphere(vertex, 0.05f);
+            Gizmos.DrawSphere(vertex, 0.02f);
         }
 
         if (edges != null) {
