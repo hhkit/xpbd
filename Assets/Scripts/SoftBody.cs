@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Linq;
 
 class Constraint
 {
@@ -20,9 +21,11 @@ public class SoftBody : MonoBehaviour
     void Start()
     {
         mesh = GetComponent<MeshFilter>().mesh;
-        Utils.UniquePoints(mesh.vertices, out system.points, out indexes);
+
+        Utils.UniquePoints(mesh.vertices, out system.positions, out indexes);
         Utils.UniqueEdges(mesh.triangles, indexes, out edges);
-        system.masses = new float[system.points.Length];
+        system.prevPositions = system.positions.ToArray();
+        system.masses = new float[system.positions.Length];
         foreach (ref var mass in system.masses.AsSpan())
             mass = 1;
 
@@ -34,14 +37,14 @@ public class SoftBody : MonoBehaviour
     {
         if (solveOnCPU)
         {
-            PositionBasedDynamicsSystem.Solve(ref system, Time.deltaTime);
+            PositionBasedDynamicsSystem.SimulateTimestep(ref system, Time.deltaTime);
             CommitMesh();
         }
     }
 
     void CommitMesh()
     {
-        Utils.Apply(system.points, indexes, out var newVertices);
+        Utils.Apply(system.positions, indexes, out var newVertices);
         mesh.vertices = newVertices;
         mesh.UploadMeshData(false);
     }

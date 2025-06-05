@@ -8,16 +8,19 @@ using UnityEngine;
 [Serializable]
 public struct SoftBodySystem
 {
-  public Vector3[] points;
+  public Vector3[] positions;
+  public Vector3[] prevPositions;
   public float[] masses;
 }
 
 public class PositionBasedDynamicsSystem
 {
-  public static void Solve(ref SoftBodySystem system, float dtSeconds)
+  public static void SimulateTimestep(ref SoftBodySystem system, float dtSeconds)
   {
-    // do solving here
-    foreach (ref var point in system.points.AsSpan())
-      point += new Vector3(0, 1, 0) * dtSeconds;
+    // simulate gravity
+    foreach (ref var point in system.positions.AsSpan())
+      point += new Vector3(0, -9.81f, 0) * dtSeconds;
+
+
   }
 }
