@@ -45,7 +45,7 @@ public partial class Utils
     return ind0 < ind1 ? (long0 << 32 | long1) : (long1 << 32 | long0);
   }
 
-  public static void UniqueEdges(int[] triangles, int[] uniqueIndexes, out ValueTuple<int, int>[] uniqueEdges)
+  public static void UniqueEdges(int[] triangles, int[] uniqueIndexes, out int[] uniqueEdges)
   {
     HashSet<long> edgeLut = new();
 
@@ -64,7 +64,7 @@ public partial class Utils
       }
     }
 
-    uniqueEdges = new ValueTuple<int, int>[edgeLut.Count];
+    uniqueEdges = new int[edgeLut.Count * 2];
     {
       var i = 0;
       foreach (var edge in edgeLut)
@@ -72,7 +72,8 @@ public partial class Utils
         var ind0 = (int)(edge & 0xFFFFFFFF);
         var ind1 = (int)((edge >> 32) & 0xFFFFFFFF);
 
-        uniqueEdges[i++] = (ind0, ind1);
+        uniqueEdges[i++] = ind0;
+        uniqueEdges[i++] = ind1;
       }
     }
   }
