@@ -22,6 +22,8 @@ public class PositionBasedDynamicsSystem
 
   public static void SimulateTimestep(ref SoftBodySystem system, float dtSeconds)
   {
+    var currPos = system.positions.ToArray();
+
     // simulate gravity
     for (int i = 0; i < system.Count; ++i)
     {
@@ -29,7 +31,6 @@ public class PositionBasedDynamicsSystem
       system.positions[i] += vel * dtSeconds + (gravity * 0.5f * dtSeconds * dtSeconds);
     }
 
-    for (int i = 0; i < system.Count; ++i)
-      system.prevPositions[i] = system.positions[i];
+    system.prevPositions = currPos;
   }
 }

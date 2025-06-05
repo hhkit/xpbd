@@ -14,7 +14,7 @@ public class SoftBody : MonoBehaviour
     public int[] indexes;
     public ValueTuple<int, int>[] edges;
     public bool solveOnCPU = true;
-
+    public bool simulate = false;
     Mesh mesh;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -33,11 +33,11 @@ public class SoftBody : MonoBehaviour
     }
 
     // Consider doing FixedUpdate instead?
-    void Update()
+    void FixedUpdate()
     {
-        if (solveOnCPU)
+        if (solveOnCPU && simulate)
         {
-            PositionBasedDynamicsSystem.SimulateTimestep(ref system, Time.deltaTime);
+            PositionBasedDynamicsSystem.SimulateTimestep(ref system, Time.fixedDeltaTime);
             CommitMesh();
         }
     }
