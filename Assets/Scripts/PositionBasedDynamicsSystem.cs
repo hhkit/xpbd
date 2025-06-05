@@ -1,7 +1,10 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using MathNet;
+using MathNet.Numerics.LinearAlgebra;
+
 
 /// <summary>
 /// A struct of array representation of a set of point masses
@@ -23,7 +26,7 @@ public class PositionBasedDynamicsSystem
 
   public static void SimulateTimestep(ref SoftBodySystem system, float dtSeconds)
   {
-    var currPos = system.positions.ToArray();
+    var startPos = system.positions.ToArray();
 
     // simulate gravity
     for (int i = 0; i < system.Count; ++i)
@@ -32,6 +35,12 @@ public class PositionBasedDynamicsSystem
       system.positions[i] += vel * dtSeconds + (gravity * 0.5f * dtSeconds * dtSeconds);
     }
 
-    system.prevPositions = currPos;
+    var masses = Vector<float>.Build.Dense(system.masses.Select((v, _) => new float[3] { v, v, v }).SelectMany(i => i).ToArray());
+    var points = Vector<float>.Build.Dense(MemoryMarshal.Cast<Vector3, float>(system.positions.AsSpan()).ToArray());
+
+    var ma = masses.PointwiseMultiply(points);
+    Debug.Log($"mass * points: {ma}");
+
+    system.prevPositions = startPos;
   }
 }
