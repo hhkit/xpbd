@@ -46,6 +46,9 @@ public class SoftBody : MonoBehaviour
     {
         Utils.Apply(system.positions, indexes, out var newVertices);
         mesh.vertices = newVertices;
+        mesh.RecalculateNormals();
+        mesh.RecalculateTangents();
+        mesh.RecalculateBounds();
         mesh.UploadMeshData(false);
     }
 }
