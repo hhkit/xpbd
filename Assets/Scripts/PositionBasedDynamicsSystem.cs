@@ -13,10 +13,11 @@ public interface xpbdConstraint
   public Vector<float> EvaluateGradient(Vector<float> positions);
 }
 
+[Serializable]
 public struct DistanceConstraint : xpbdConstraint
 {
   public int first, second; // public int indexes[2];
-  public float lengthSq;
+  public float length;
 
   public float Stiffness { get; set; }
 
@@ -25,7 +26,8 @@ public struct DistanceConstraint : xpbdConstraint
     var p1 = new Vector3(positions[first * 3], positions[first * 3 + 1], positions[first * 3 + 2]);
     var p2 = new Vector3(positions[second * 3], positions[second * 3 + 1], positions[second * 3 + 2]);
 
-    return (p1 - p2).sqrMagnitude - lengthSq; // okay this is definitely wrong
+    var deltaX = (p1 - p2).magnitude;
+    return deltaX * deltaX;
 
   }
 
@@ -65,7 +67,7 @@ public struct SoftBodySystem
   public Vector3[] positions;
   public Vector3[] prevPositions;
   public float[] masses;
-  public xpbdConstraint[] constraints;
+  public DistanceConstraint[] constraints;
 
   public int Count => positions.Length;
 }
@@ -85,9 +87,19 @@ public class PositionBasedDynamicsSystem
     // simulate gravity
     for (int i = 0; i < system.Count; ++i)
     {
-      var vel = (system.positions[i] - system.prevPositions[i]) / dtSeconds;
-      system.positions[i] += vel * dtSeconds + (gravity * 0.5f * dtSeconds * dtSeconds);
+      var position = system.positions[i];
+      var prevPosition = system.prevPositions[i];
+
+      var vel = (position - prevPosition) / dtSeconds;
+      position += vel * dtSeconds + (gravity * 0.5f * dtSeconds * dtSeconds);
+
+      // don't drop below 0
+      if (position.y < 0)
+        position.y = 0;
+
+      system.positions[i] = position;
     }
+
 
     var invMasses = Vf.Dense(system.masses.Select((v, i) => 1f / v).Duplicate(3).ToArray());
     var positions = Vf.Dense(system.positions.Reinterpret<Vector3, float>().ToArray());

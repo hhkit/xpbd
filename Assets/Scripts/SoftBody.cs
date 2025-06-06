@@ -41,7 +41,7 @@ public class SoftBody : MonoBehaviour
         Utils.UniquePoints(mesh.vertices, out system.positions, out indexes);
         Utils.UniqueEdges(mesh.triangles, indexes, out edges);
 
-        system.constraints = new xpbdConstraint[edges.Length / 2];
+        system.constraints = new DistanceConstraint[edges.Length / 2];
 
         for (int i = 0; i < system.constraints.Length; ++i)
         {
@@ -51,8 +51,8 @@ public class SoftBody : MonoBehaviour
             var distanceConstraint = new DistanceConstraint();
             distanceConstraint.first = i0;
             distanceConstraint.second = i1;
-            distanceConstraint.lengthSq = (system.positions[i0] - system.positions[i1]).sqrMagnitude;
-            distanceConstraint.Stiffness = 1;
+            distanceConstraint.length = (system.positions[i0] - system.positions[i1]).magnitude;
+            distanceConstraint.Stiffness = 0.01f;
             system.constraints[i] = distanceConstraint;
         }
 
