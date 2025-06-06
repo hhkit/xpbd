@@ -8,7 +8,7 @@ using MathNet.Numerics.LinearAlgebra;
 
 public interface xpbdConstraint
 {
-  public float Stiffness { get; }
+  public float InvStiffness { get; }
   public float Evaluate(Vector<float> positions);
   public Vector<float> EvaluateGradient(Vector<float> positions);
 }
@@ -19,15 +19,16 @@ public struct DistanceConstraint : xpbdConstraint
   public int first, second; // public int indexes[2];
   public float length;
 
-  public float Stiffness { get; set; }
+  public float invStiffness;
+  public float InvStiffness { get => invStiffness; }
 
   public float Evaluate(Vector<float> positions)
   {
     var p1 = new Vector3(positions[first * 3], positions[first * 3 + 1], positions[first * 3 + 2]);
     var p2 = new Vector3(positions[second * 3], positions[second * 3 + 1], positions[second * 3 + 2]);
 
-    var deltaX = (p1 - p2).magnitude;
-    return deltaX * deltaX;
+    var deltaX = (p1 - p2).magnitude - length;
+    return deltaX;
 
   }
 
@@ -35,24 +36,23 @@ public struct DistanceConstraint : xpbdConstraint
   {
     var Vf = Vector<float>.Build;
 
-    var grad = Vf.Sparse(positions.Count);
+    var grad = Vf.Sparse(positions.Count, 0f);
 
-    var x1 = positions[first * 3];
-    var y1 = positions[first * 3 + 1];
-    var z1 = positions[first * 3 + 2];
+    var p1 = new Vector3(positions[first * 3], positions[first * 3 + 1], positions[first * 3 + 2]);
+    var p2 = new Vector3(positions[second * 3], positions[second * 3 + 1], positions[second * 3 + 2]);
 
-    var x2 = positions[second * 3];
-    var y2 = positions[second * 3 + 1];
-    var z2 = positions[second * 3 + 2];
+    var v = p1 - p2;
+    var invVLength = 1f / v.magnitude;
+    var unitV = v * invVLength;
 
     // grad of x1
-    grad[first * 3] = 2 * (x2 - x1);
-    grad[first * 3 + 1] = 2 * (y2 - y1);
-    grad[first * 3 + 2] = 2 * (z2 - z1);
+    grad[first * 3] = unitV.x;
+    grad[first * 3 + 1] = unitV.y;
+    grad[first * 3 + 2] = unitV.z;
 
-    grad[second * 3] = 2 * (x1 - x2);
-    grad[second * 3 + 1] = 2 * (y1 - y2);
-    grad[second * 3 + 2] = 2 * (z1 - z2);
+    grad[second * 3] = -unitV.x;
+    grad[second * 3 + 1] = -unitV.y;
+    grad[second * 3 + 2] = -unitV.z;
     return grad;
   }
 }
@@ -82,6 +82,7 @@ public class PositionBasedDynamicsSystem
     var Vf = Vector<float>.Build;
     var Mf = Matrix<float>.Build;
 
+    var dtSecondsSq = dtSeconds * dtSeconds;
     var startPos = system.positions.ToArray();
 
     // simulate gravity
@@ -115,7 +116,7 @@ public class PositionBasedDynamicsSystem
         var c = constraint.Evaluate(positions);
         var dc = constraint.EvaluateGradient(positions);
 
-        var delLagrange = Equation18(c, dc, invMasses, lagrange[j], constraint);
+        var delLagrange = Equation18(c, dc, invMasses, lagrange[j], constraint, dtSecondsSq);
         var delX = Equation17(dc, invMasses, delLagrange, constraint);
         lagrange[j] += delLagrange;
         positions += delX;
@@ -126,9 +127,11 @@ public class PositionBasedDynamicsSystem
     system.prevPositions = startPos;
   }
 
-  public static float Equation18(float c, Vector<float> dc, Vector<float> invMasses, float lagrange, xpbdConstraint constraint)
+  public static float Equation18(float c, Vector<float> dc, Vector<float> invMasses, float lagrange, xpbdConstraint constraint, float dtSecondsSq)
   {
-    return (-c - constraint.Stiffness * lagrange) / (dc.DotProduct(invMasses.PointwiseMultiply(dc)) + constraint.Stiffness);
+    Debug.Log($"{constraint.InvStiffness} help");
+    var alphaTilde = constraint.InvStiffness / dtSecondsSq; // paragrah after Equation 4
+    return (-c - alphaTilde * lagrange) / (dc.DotProduct(invMasses.PointwiseMultiply(dc)) + alphaTilde);
   }
 
   public static Vector<float> Equation17(Vector<float> dc, Vector<float> invMasses, float delLagrange, xpbdConstraint constraint)

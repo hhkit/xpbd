@@ -15,6 +15,8 @@ public class SoftBody : MonoBehaviour
     public int[] indexes;
     public int[] edges;
     public bool solveOnCPU = true;
+    [Range(0f, 20f)]
+    public float initialInverseStiffness = 0.01f;
 
     [SerializeField] bool cached = false;
     Mesh mesh;
@@ -52,7 +54,7 @@ public class SoftBody : MonoBehaviour
             distanceConstraint.first = i0;
             distanceConstraint.second = i1;
             distanceConstraint.length = (system.positions[i0] - system.positions[i1]).magnitude;
-            distanceConstraint.Stiffness = 0.01f;
+            distanceConstraint.invStiffness = initialInverseStiffness;
             system.constraints[i] = distanceConstraint;
         }
 
