@@ -129,7 +129,6 @@ public class PositionBasedDynamicsSystem
 
   public static float Equation18(float c, Vector<float> dc, Vector<float> invMasses, float lagrange, xpbdConstraint constraint, float dtSecondsSq)
   {
-    Debug.Log($"{constraint.InvStiffness} help");
     var alphaTilde = constraint.InvStiffness / dtSecondsSq; // paragrah after Equation 4
     return (-c - alphaTilde * lagrange) / (dc.DotProduct(invMasses.PointwiseMultiply(dc)) + alphaTilde);
   }
