@@ -15,7 +15,7 @@ public class SoftBody : MonoBehaviour
     public int[] indexes;
     public int[] edges;
     public bool solveOnCPU = true;
-    [Range(0f, 20f)]
+    [Range(0f, 0.05f)]
     public float initialInverseStiffness = 0.01f;
 
     [SerializeField] bool cached = false;
