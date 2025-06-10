@@ -51,8 +51,7 @@ public class SoftBody : MonoBehaviour
             var i1 = edges[i * 2 + 1];
 
             var distanceConstraint = new DistanceConstraint();
-            distanceConstraint.first = i0;
-            distanceConstraint.second = i1;
+            distanceConstraint.points = new int[] { i0, i1 };
             distanceConstraint.length = (system.positions[i0] - system.positions[i1]).magnitude;
             distanceConstraint.invStiffness = initialInverseStiffness;
             system.constraints[i] = distanceConstraint;
@@ -61,8 +60,11 @@ public class SoftBody : MonoBehaviour
         ApplyTransform();
 
         system.masses = new float[system.positions.Length];
+        system.invMasses = new float[system.positions.Length];
         foreach (ref var mass in system.masses.AsSpan())
             mass = 1;
+        foreach (ref var invMass in system.invMasses.AsSpan())
+            invMass = 1;
 
         mesh.MarkDynamic();
         CommitMesh();

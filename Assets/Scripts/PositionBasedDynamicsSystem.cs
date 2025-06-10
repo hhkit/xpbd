@@ -1,59 +1,51 @@
 using System;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Collections.Generic;
 using UnityEngine;
-using MathNet;
-using MathNet.Numerics.LinearAlgebra;
 
 
 public interface xpbdConstraint
 {
+  public int[] Points { get; }
+  public int Count { get; }
   public float InvStiffness { get; }
-  public float Evaluate(Vector<float> positions);
-  public Vector<float> EvaluateGradient(Vector<float> positions);
+  public float Evaluate(Vector3[] positions);
+  public void EvaluateGradient(Vector3[] positions, ref Vector3[] gradient);
 }
 
 [Serializable]
 public struct DistanceConstraint : xpbdConstraint
 {
-  public int first, second; // public int indexes[2];
+  public int[] points;
+  public readonly int[] Points { get => points; }
+  public int Count { get => Points.Length; }
+
   public float length;
 
   public float invStiffness;
   public float InvStiffness { get => invStiffness; }
 
-  public float Evaluate(Vector<float> positions)
+  public float Evaluate(Vector3[] positions)
   {
-    var p1 = new Vector3(positions[first * 3], positions[first * 3 + 1], positions[first * 3 + 2]);
-    var p2 = new Vector3(positions[second * 3], positions[second * 3 + 1], positions[second * 3 + 2]);
+    var p1 = positions[points[0]];
+    var p2 = positions[points[1]];
 
     var deltaX = (p1 - p2).magnitude - length;
     return deltaX;
 
   }
 
-  public Vector<float> EvaluateGradient(Vector<float> positions)
+  public void EvaluateGradient(Vector3[] positions, ref Vector3[] gradient)
   {
-    var Vf = Vector<float>.Build;
-
-    var grad = Vf.Sparse(positions.Count, 0f);
-
-    var p1 = new Vector3(positions[first * 3], positions[first * 3 + 1], positions[first * 3 + 2]);
-    var p2 = new Vector3(positions[second * 3], positions[second * 3 + 1], positions[second * 3 + 2]);
+    var p1 = positions[points[0]];
+    var p2 = positions[points[1]];
 
     var v = p1 - p2;
-    var invVLength = 1f / v.magnitude;
-    var unitV = v * invVLength;
+    var unitV = v.normalized;
 
     // grad of x1
-    grad[first * 3] = unitV.x;
-    grad[first * 3 + 1] = unitV.y;
-    grad[first * 3 + 2] = unitV.z;
-
-    grad[second * 3] = -unitV.x;
-    grad[second * 3 + 1] = -unitV.y;
-    grad[second * 3 + 2] = -unitV.z;
-    return grad;
+    gradient[0] = unitV;
+    gradient[1] = -unitV;
   }
 }
 
@@ -67,6 +59,7 @@ public struct SoftBodySystem
   public Vector3[] positions;
   public Vector3[] prevPositions;
   public float[] masses;
+  public float[] invMasses;
   public DistanceConstraint[] constraints;
 
   public int Count => positions.Length;
@@ -75,15 +68,26 @@ public struct SoftBodySystem
 
 public class PositionBasedDynamicsSystem
 {
+  static void Swap<T>(ref T lhs, ref T rhs)
+  {
+    (rhs, lhs) = (lhs, rhs);
+  }
+
   static Vector3 gravity = new Vector3(0, -9.81f, 0);
+  static Vector3[] scratchGradient = new Vector3[2];
+  static Vector3[] positionCache = new Vector3[2];
+  static float[] scratchLagrange = new float[3];
+
 
   public static void SimulateTimestep(ref SoftBodySystem system, float dtSeconds)
   {
-    var Vf = Vector<float>.Build;
-    var Mf = Matrix<float>.Build;
-
     var dtSecondsSq = dtSeconds * dtSeconds;
-    var startPos = system.positions.ToArray();
+
+    if (positionCache.Length < system.positions.Length)
+      positionCache = new Vector3[system.positions.Length];
+
+    for (int i = 0; i < system.positions.Length; ++i)
+      positionCache[i] = system.positions[i];
 
     // simulate gravity
     for (int i = 0; i < system.Count; ++i)
@@ -101,40 +105,57 @@ public class PositionBasedDynamicsSystem
       system.positions[i] = position;
     }
 
-
-    var invMasses = Vf.Dense(system.masses.Select((v, i) => 1f / v).Duplicate(3).ToArray());
-    var positions = Vf.Dense(system.positions.Reinterpret<Vector3, float>().ToArray());
+    var positions = system.positions;
+    var invMasses = system.invMasses;
 
     const int iterations = 20;
-    var lagrange = Vf.Sparse(system.constraints.Length); // all zeroes... hopefully
+
+    if (scratchLagrange.Length < system.constraints.Length)
+      scratchLagrange = new float[system.constraints.Length];
+
+    var lagrange = scratchLagrange;
+    foreach (ref var lag in lagrange.AsSpan())
+      lag = 0f;
+
     for (int i = 0; i < iterations; ++i)
     {
       for (int j = 0; j < system.constraints.Length; ++j)
       {
         var constraint = system.constraints[j];
+        var points = constraint.Points;
+
+        if (scratchGradient.Length < constraint.Count)
+          scratchGradient = new Vector3[constraint.Count];
 
         var c = constraint.Evaluate(positions);
-        var dc = constraint.EvaluateGradient(positions);
+        constraint.EvaluateGradient(positions, ref scratchGradient);
+        var dc = scratchGradient;
 
-        var delLagrange = Equation18(c, dc, invMasses, lagrange[j], constraint, dtSecondsSq);
-        var delX = Equation17(dc, invMasses, delLagrange, constraint);
-        lagrange[j] += delLagrange;
-        positions += delX;
+        var myInvMasses = points.Select((p, _) => invMasses[p]);
+
+        var delLagrange = Equation18(c, dc, myInvMasses, lagrange[j], constraint, dtSecondsSq);
+        var delX = Equation17(dc, myInvMasses, delLagrange);
+
+        lagrange[j] += delLagrange; // update lagrange
+        foreach (var _ in points.Zip(delX, (p, dx) => positions[p] += dx)) ; // update X, disgusting code to force evaluate the linq expr
       }
     }
 
-    system.positions = positions.AsArray().Reinterpret<float, Vector3>().ToArray();
-    system.prevPositions = startPos;
+    Swap(ref system.prevPositions, ref positionCache);
   }
 
-  public static float Equation18(float c, Vector<float> dc, Vector<float> invMasses, float lagrange, xpbdConstraint constraint, float dtSecondsSq)
+  public static float Equation18(float c, Vector3[] dc, IEnumerable<float> myInvMasses, float lagrange, xpbdConstraint constraint, float dtSecondsSq)
   {
     var alphaTilde = constraint.InvStiffness / dtSecondsSq; // paragrah after Equation 4
-    return (-c - alphaTilde * lagrange) / (dc.DotProduct(invMasses.PointwiseMultiply(dc)) + alphaTilde);
+    var denom = myInvMasses
+                  .Zip(dc, (invMass, grad) => invMass * Vector3.Dot(grad, grad))
+                  .Sum();
+
+    return (-c - alphaTilde * lagrange) / (denom + alphaTilde);
   }
 
-  public static Vector<float> Equation17(Vector<float> dc, Vector<float> invMasses, float delLagrange, xpbdConstraint constraint)
+  public static Vector3[] Equation17(Vector3[] dc, IEnumerable<float> myInvMasses, float delLagrange)
   {
-    return invMasses.PointwiseMultiply(dc) * delLagrange;
+    return myInvMasses.Zip(dc, (invMass, grad) => invMass * grad * delLagrange).ToArray();
   }
 }
